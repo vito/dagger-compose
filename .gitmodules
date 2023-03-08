@@ -1,0 +1,4 @@
+[submodule "dagger"]
+	path = dagger
+	url = https://github.com/vito/dagger
+	branch = h2c-networking
