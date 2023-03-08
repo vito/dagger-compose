@@ -117,7 +117,7 @@ func buildService(c *dagger.Client, project *types.Project, svc types.ServiceCon
 		case types.VolumeTypeBind:
 			ctr = ctr.WithMountedDirectory(vol.Target, c.Host().Directory(vol.Source))
 		case types.VolumeTypeVolume:
-			ctr = ctr.WithMountedCache(vol.Target, c.CacheVolume(vol.Source+time.Now().String())) // TODO
+			ctr = ctr.WithMountedCache(vol.Target, c.CacheVolume(vol.Source))
 		default:
 			return nil, fmt.Errorf("volume type %s not supported", vol.Type)
 		}
