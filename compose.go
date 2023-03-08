@@ -18,7 +18,10 @@ func main() {
 
 	opts, err := cli.NewProjectOptions(nil,
 		cli.WithWorkingDirectory("."),
-		cli.WithDefaultConfigPath)
+		cli.WithDefaultConfigPath,
+		cli.WithOsEnv,
+		cli.WithConfigFileEnv,
+	)
 	if err != nil {
 		panic(err)
 	}
