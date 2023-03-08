@@ -39,20 +39,14 @@ func main() {
 
 	eg, ctx := errgroup.WithContext(ctx)
 
-	services := map[string]*dagger.Container{}
 	for _, svc := range project.Services {
 		ctr, err := buildService(c, project, svc)
 		if err != nil {
 			panic(err)
 		}
 
-		services[svc.Name] = ctr
-	}
-
-	for _, svc := range services {
-		svc := svc
 		eg.Go(func() error {
-			return svc.Run(ctx)
+			return ctr.Run(ctx)
 		})
 	}
 
