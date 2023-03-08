@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
-	"time"
 
 	"dagger.io/dagger"
 	"github.com/compose-spec/compose-go/cli"
@@ -81,10 +81,19 @@ func buildService(c *dagger.Client, project *types.Project, svc types.ServiceCon
 		})
 	}
 
+	// sort env to ensure same container
+	type env struct{ name, value string }
+	envs := []env{}
 	for name, val := range svc.Environment {
 		if val != nil {
-			ctr = ctr.WithEnvVariable(name, *val)
+			envs = append(envs, env{name, *val})
 		}
+	}
+	sort.Slice(envs, func(i, j int) bool {
+		return envs[i].name < envs[j].name
+	})
+	for _, env := range envs {
+		ctr = ctr.WithEnvVariable(env.name, env.value)
 	}
 
 	for _, port := range svc.Ports {
