@@ -40,7 +40,7 @@ func main() {
 	eg, ctx := errgroup.WithContext(ctx)
 
 	for _, svc := range project.Services {
-		ctr, err := buildService(c, project, svc)
+		ctr, err := serviceContainer(c, project, svc)
 		if err != nil {
 			panic(err)
 		}
@@ -56,7 +56,7 @@ func main() {
 	}
 }
 
-func buildService(c *dagger.Client, project *types.Project, svc types.ServiceConfig) (*dagger.Container, error) {
+func serviceContainer(c *dagger.Client, project *types.Project, svc types.ServiceConfig) (*dagger.Container, error) {
 	ctr := c.Pipeline(svc.Name).Container()
 	if svc.Image != "" {
 		ctr = ctr.From(svc.Image)
@@ -135,7 +135,7 @@ func buildService(c *dagger.Client, project *types.Project, svc types.ServiceCon
 			return nil, err
 		}
 
-		svcCtr, err := buildService(c, project, cfg)
+		svcCtr, err := serviceContainer(c, project, cfg)
 		if err != nil {
 			return nil, err
 		}
