@@ -16,7 +16,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	opts, err := cli.NewProjectOptions(nil,
+	opts, err := cli.NewProjectOptions(os.Args[1:],
 		cli.WithWorkingDirectory("."),
 		cli.WithDefaultConfigPath,
 		cli.WithOsEnv,
