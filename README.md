@@ -2,15 +2,15 @@
 
 Runs `docker-compose.yml`... but in Dagger. 📢💨📢💨 (those are airhorns)
 
-Currently uses a VERY hacky host-to-container implementation.
+Currently uses a proof-of-concept host-to-container implementation.
 
 ## Example
 
-The included `docker-compose.yml` runs WordPress, published to port 8080 on the
+The included `wordpress.yml` runs WordPress, published to port 8080 on the
 host.
 
 ```sh
-go run .
+go run . wordpress.yml
 ```
 
 ## Thanks
