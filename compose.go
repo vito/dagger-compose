@@ -40,14 +40,26 @@ func main() {
 	eg, ctx := errgroup.WithContext(ctx)
 
 	for _, svc := range project.Services {
-		ctr, err := serviceContainer(c, project, svc)
+		daggerSvc, err := serviceContainer(c, project, svc)
 		if err != nil {
 			panic(err)
 		}
 
 		eg.Go(func() error {
-			return ctr.Run(ctx)
+			return daggerSvc.Run(ctx)
 		})
+
+		for _, port := range daggerSvc.PublishedPorts {
+			port := port
+			eg.Go(func() error {
+				return daggerSvc.Socket(dagger.ContainerSocketOpts{
+					Port:     port.Target,
+					Protocol: port.Protocol,
+				}).Bind(ctx, port.Address, dagger.SocketBindOpts{
+					Family: port.Family,
+				})
+			})
+		}
 	}
 
 	err = eg.Wait()
@@ -56,7 +68,20 @@ func main() {
 	}
 }
 
-func serviceContainer(c *dagger.Client, project *types.Project, svc types.ServiceConfig) (*dagger.Container, error) {
+type Service struct {
+	*dagger.Container
+
+	PublishedPorts []PublishedPort
+}
+
+type PublishedPort struct {
+	Address  string
+	Family   dagger.NetworkFamily
+	Target   int
+	Protocol dagger.NetworkProtocol
+}
+
+func serviceContainer(c *dagger.Client, project *types.Project, svc types.ServiceConfig) (*Service, error) {
 	ctr := c.Pipeline(svc.Name).Container()
 	if svc.Image != "" {
 		ctr = ctr.From(svc.Image)
@@ -93,6 +118,7 @@ func serviceContainer(c *dagger.Client, project *types.Project, svc types.Servic
 		ctr = ctr.WithEnvVariable(env.name, env.value)
 	}
 
+	published := []PublishedPort{}
 	for _, port := range svc.Ports {
 		switch port.Mode {
 		case "ingress":
@@ -101,8 +127,23 @@ func serviceContainer(c *dagger.Client, project *types.Project, svc types.Servic
 				return nil, err
 			}
 
-			ctr = ctr.WithExposedPort(int(port.Target), dagger.ContainerWithExposedPortOpts{
-				Publish: publishedPort,
+			ctr = ctr.WithExposedPort(int(port.Target))
+
+			protocol := dagger.Tcp
+			switch port.Protocol {
+			case "udp":
+				protocol = dagger.Udp
+			case "", "tcp":
+				protocol = dagger.Tcp
+			default:
+				return nil, fmt.Errorf("protocol %s not supported", port.Protocol)
+			}
+
+			published = append(published, PublishedPort{
+				Address:  fmt.Sprintf(":%d", publishedPort),
+				Family:   dagger.Ip,
+				Target:   int(port.Target),
+				Protocol: protocol,
 			})
 		default:
 			return nil, fmt.Errorf("port mode %s not supported", port.Mode)
@@ -135,12 +176,12 @@ func serviceContainer(c *dagger.Client, project *types.Project, svc types.Servic
 			return nil, err
 		}
 
-		svcCtr, err := serviceContainer(c, project, cfg)
+		svc, err := serviceContainer(c, project, cfg)
 		if err != nil {
 			return nil, err
 		}
 
-		ctr = ctr.WithServiceBinding(depName, svcCtr)
+		ctr = ctr.WithServiceBinding(depName, svc.Container)
 	}
 
 	var opts dagger.ContainerWithExecOpts
@@ -150,5 +191,8 @@ func serviceContainer(c *dagger.Client, project *types.Project, svc types.Servic
 
 	ctr = ctr.WithExec(svc.Command, opts)
 
-	return ctr, nil
+	return &Service{
+		Container:      ctr,
+		PublishedPorts: published,
+	}, nil
 }
