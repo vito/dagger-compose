@@ -37,7 +37,7 @@ func main() {
 	}
 	defer c.Close()
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg := new(errgroup.Group)
 
 	for _, svc := range project.Services {
 		daggerSvc, err := serviceContainer(c, project, svc)
@@ -45,19 +45,14 @@ func main() {
 			panic(err)
 		}
 
-		eg.Go(func() error {
-			return daggerSvc.Run(ctx)
-		})
-
 		for _, port := range daggerSvc.PublishedPorts {
-			port := port
+			proxy := daggerSvc.Proxy(port.Address, dagger.ServiceProxyOpts{
+				ServicePort: port.Target,
+				Protocol:    port.Protocol,
+			})
 			eg.Go(func() error {
-				return daggerSvc.Socket(dagger.ContainerSocketOpts{
-					Port:     port.Target,
-					Protocol: port.Protocol,
-				}).Bind(ctx, port.Address, dagger.SocketBindOpts{
-					Family: port.Family,
-				})
+				_, err := proxy.Start(ctx)
+				return err
 			})
 		}
 	}
@@ -66,17 +61,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	<-ctx.Done()
 }
 
 type Service struct {
-	*dagger.Container
+	*dagger.Service
 
 	PublishedPorts []PublishedPort
 }
 
 type PublishedPort struct {
 	Address  string
-	Family   dagger.NetworkFamily
 	Target   int
 	Protocol dagger.NetworkProtocol
 }
@@ -141,7 +137,6 @@ func serviceContainer(c *dagger.Client, project *types.Project, svc types.Servic
 
 			published = append(published, PublishedPort{
 				Address:  fmt.Sprintf(":%d", publishedPort),
-				Family:   dagger.Ip,
 				Target:   int(port.Target),
 				Protocol: protocol,
 			})
@@ -181,7 +176,7 @@ func serviceContainer(c *dagger.Client, project *types.Project, svc types.Servic
 			return nil, err
 		}
 
-		ctr = ctr.WithServiceBinding(depName, svc.Container)
+		ctr = ctr.WithServiceBinding(depName, svc.Service)
 	}
 
 	var opts dagger.ContainerWithExecOpts
@@ -192,7 +187,7 @@ func serviceContainer(c *dagger.Client, project *types.Project, svc types.Servic
 	ctr = ctr.WithExec(svc.Command, opts)
 
 	return &Service{
-		Container:      ctr,
+		Service:        ctr.Service(),
 		PublishedPorts: published,
 	}, nil
 }
