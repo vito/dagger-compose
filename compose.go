@@ -45,11 +45,17 @@ func main() {
 			panic(err)
 		}
 
+		eg.Go(func() error {
+			_, err := daggerSvc.Start(ctx)
+			return err
+		})
+
 		for _, port := range daggerSvc.PublishedPorts {
 			proxy := daggerSvc.Proxy(port.Address, dagger.ServiceProxyOpts{
 				ServicePort: port.Target,
 				Protocol:    port.Protocol,
 			})
+
 			eg.Go(func() error {
 				_, err := proxy.Start(ctx)
 				return err
